@@ -6,9 +6,9 @@ import os
 
 home_dir = '/mnt/c/Users/chris/OneDrive/Desktop/'
 
-n_correlators = 2
+n_correlators = 3
 n_tau = 48
-n_configs = 151
+n_configs = 50
 
 def read_lattice_data(file_path):
     """
@@ -47,7 +47,7 @@ def read_lattice_data(file_path):
         if nums:
             numeric_rows.append(nums)
 
-    del numeric_rows[-1] # remove last row where the deletion of the propagators is logged
+    #del numeric_rows[-1] # remove last row where the deletion of the propagators is logged
     data = np.array(numeric_rows, dtype=float)
     data = data[:,6:-1] # only retain the correlator data
     return np.squeeze(data)
@@ -98,14 +98,13 @@ def fit_function(tau, A, m):
 
 def main():
     data = []
-    for files in os.listdir(os.path.join(home_dir, 'pion_lattice_data')):
-        data.append(read_lattice_data(os.path.join(home_dir, 'pion_lattice_data', files)))
-    print("Data read from file:")
+    for files in os.listdir(os.path.join(home_dir, 'pion_lattice_data/second_run/')):
+        data.append(read_lattice_data(os.path.join(home_dir, 'pion_lattice_data/second_run/', files)))
+    print("Data read from files.")
     data = np.array(data) # the data array is the concatenated correlators for each configuration
     correlators = np.zeros((n_correlators, n_configs, n_tau))
     for i in range(n_correlators):
         correlators[i] = data[:,i*n_tau:(i+1)*n_tau] # seperate the correlators
-    print(correlators.shape)
     ### Create binned data for each correlator
     bin_size = 10
     binned_correlators = []
@@ -159,8 +158,8 @@ def main():
     for i in range(n_correlators):
         mean_correlator = np.mean(correlators[i], axis=0)
         plt.figure()
-        plt.errorbar(tau, mean_correlator, yerr=np.std(correlators[i], axis=0), fmt='o', alpha=0.5)
-        plt.plot(tau, fit_function(tau, *popt), 'r-', label='Fit')
+        plt.errorbar(tau, mean_correlator, yerr=np.std(correlators[i], axis=0), fmt='x', markeredgewidth=1, elinewidth=1, capsize=3)
+        #plt.plot(tau, fit_function(tau, *popt), 'r-', label='Fit')
         plt.yscale('log')
         plt.xlabel('tau')
         plt.ylabel('Correlator')
