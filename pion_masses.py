@@ -12,8 +12,8 @@ n_configs = 50
 
 # relevant variables for plotting
 tau = np.arange(n_tau)
-colors = ['b', 'g', 'm', 'c', 'y', 'k', 'orange', 'purple']
-kappa_values = np.array([0.1337, 0.1339, 0.1341, 0.1343, 0.1345, 0.1347, 0.1348, 0.13485]) # coming up: 0.13490
+colors = ['b', 'g', 'm', 'c', 'y', 'k', 'orange', 'purple', 'brown']
+kappa_values = np.array([0.1337, 0.1339, 0.1341, 0.1343, 0.1345, 0.1347, 0.1348, 0.13485]) # coming up: 0.13475
 
 def read_lattice_data(file_path):
     """
@@ -164,35 +164,35 @@ def fit_correlator(jk_correlators, jk_error, fitrange):
     masses = []
     factor = []
     chisq = []
-    jk_error = jk_error[:, int(n_tau/2)-fitrange: int(n_tau/2)+fitrange]
+    jk_error = jk_error[:, int(n_tau/2 + 1)-fitrange: int(n_tau/2 + 1)+fitrange]
     for i in range(n_correlators):
         mean_correlator = np.mean(jk_correlators, axis=1)[i]
-        mean_correlator = mean_correlator[int(n_tau/2)-fitrange: int(n_tau/2)+fitrange]
+        mean_correlator = mean_correlator[int(n_tau/2 + 1)-fitrange: int(n_tau/2 + 1)+fitrange]
         popt, pcov = curve_fit(
             fit_function, 
-            np.arange(int(n_tau/2)-fitrange,  int(n_tau/2)+fitrange), 
+            np.arange(int(n_tau/2  + 1)-fitrange,  int(n_tau/2 + 1)+fitrange), 
             mean_correlator, 
             sigma = jk_error[i][:])
         ndof = len(mean_correlator) - len(popt)
         factor.append(popt[0])
         masses.append(popt[1])
-        chisq.append(chi_squared(mean_correlator, fit_function(np.arange(int(n_tau/2)-fitrange, int(n_tau/2)+fitrange), *popt), ndof, jk_error))
+        chisq.append(chi_squared(mean_correlator, fit_function(np.arange(int(n_tau/2 + 1)-fitrange, int(n_tau/2 + 1)+fitrange), *popt), ndof, jk_error))
         print(f'Fitted mass for correlator {i+1}: {popt[1]}')
     return masses, factor, chisq
 
 def jackknife_mass_errors(jk_correlators, jk_error, n_jackknife, fitrange):
     jackknife_masses = []
     jackknife_masses_errors = []
-    jk_error = jk_error[:, int(n_tau/2)-fitrange: int(n_tau/2)+fitrange]
+    jk_error = jk_error[:, int(n_tau/2 + 1)-fitrange: int(n_tau/2 + 1)+fitrange]
     for i in range(n_correlators):
         jk_masses = []
         jk_factors = []
         for j in range(n_jackknife):
             jk_sample = jk_correlators[i][j]
-            jk_sample = jk_sample[int(n_tau/2)-fitrange: int(n_tau/2)+fitrange]
+            jk_sample = jk_sample[int(n_tau/2 + 1)-fitrange: int(n_tau/2 + 1)+fitrange]
             popt, pcov = curve_fit(
                 fit_function, 
-                np.arange(int(n_tau/2)-fitrange,  int(n_tau/2)+fitrange), 
+                np.arange(int(n_tau/2 + 1)-fitrange,  int(n_tau/2 + 1)+fitrange), 
                 jk_sample, 
                 sigma = jk_error[i][:])
             jk_factors.append(popt[0])
@@ -261,6 +261,17 @@ def plot_kappa_values(p, m_pi, pion_mass, determined_kappa, jk_masses_errors):
     plt.savefig(os.path.join(home_dir, 'pion_masses/', 'pion_mass_vs_kappa.png'))
     plt.close()
 
+def plot_corr_vs_configs(correlators):
+    plt.figure()
+    n_configs = correlators.shape[1]
+    for i in range(correlators.shape[0]):
+        plt.plot(np.arange(n_configs), correlators[i, :, 10], label=f'Correlator {i+1}')
+    plt.xlabel('Number of Configurations')
+    plt.ylabel('Correlator Value at tau=10')
+    plt.title('Correlator vs Number of Configurations')
+    plt.legend()
+    plt.savefig(os.path.join(home_dir, 'pion_masses/', 'corr_vs_configs.png'))
+    plt.close()
 
 def main():
     run_paths = [
@@ -268,6 +279,7 @@ def main():
         os.path.join(home_dir, 'pion_lattice_data/third_run/'),
         os.path.join(home_dir, 'pion_lattice_data/fourth_run/'),
         os.path.join(home_dir, 'pion_lattice_data/fifth_run/'),
+        #os.path.join(home_dir, 'pion_lattice_data/sixth_run/')
     ]
 
     runs = [load_run(p) for p in run_paths]               # each run: (n_configs_run, n_correlators, n_tau)
@@ -277,6 +289,9 @@ def main():
     correlators = np.transpose(all_runs, (1, 0, 2))       # (n_correlator, n_configs_total, n_tau)
 
     print("Correlators shape:", correlators.shape)
+    ### Plot the correlator at one time slice vs the number of configurations
+    plot_corr_vs_configs(correlators)
+    exit()
     ### Create binned data for each correlator
     binned_correlators = create_binned_data(correlators, bin_size=10)
     ### Create jackknife samples for each correlator
@@ -288,7 +303,7 @@ def main():
     print("Processed data saved.")
     ### Fit the correlators to extract masses 
     ### (note that the range of tau values for the fit function needs to be adjusted by effective mass)
-    fitrange = 16
+    fitrange = 10
     masses, factor, chisq = fit_correlator(jackknife_correlators, jackknife_error, fitrange)    
     ### Save the fitted masses
     np.save(os.path.join(home_dir, 'pion_masses/', 'fitted_masses.npy'), np.array(masses))
