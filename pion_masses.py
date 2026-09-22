@@ -11,9 +11,9 @@ n_tau = 48
 n_configs = 50
 
 # relevant variables for plotting
-tau = np.arange(n_tau)
-colors = ['b', 'g', 'm', 'c', 'y', 'k', 'orange', 'purple', 'brown']
-kappa_values = np.array([0.1337, 0.1339, 0.1341, 0.1343, 0.1345, 0.1347, 0.1348, 0.13485]) # coming up: 0.13475
+#tau = np.arange(n_tau)
+#colors = ['b', 'g', 'm', 'c', 'y', 'k', 'orange', 'purple', 'brown']
+#kappa_values = np.array([0.1337, 0.1339, 0.1341, 0.1343, 0.1345, 0.1347, 0.1348, 0.13485]) # coming up: 0.13475
 
 def read_lattice_data(file_path):
     """
@@ -274,13 +274,15 @@ def plot_corr_vs_configs(correlators):
     plt.close()
 
 def main():
-    run_paths = [
+    """run_paths = [
         os.path.join(home_dir, 'pion_lattice_data/second_run/'),
         os.path.join(home_dir, 'pion_lattice_data/third_run/'),
         os.path.join(home_dir, 'pion_lattice_data/fourth_run/'),
         os.path.join(home_dir, 'pion_lattice_data/fifth_run/'),
         #os.path.join(home_dir, 'pion_lattice_data/sixth_run/')
-    ]
+    ]"""
+
+    run_paths = []
 
     runs = [load_run(p) for p in run_paths]               # each run: (n_configs_run, n_correlators, n_tau)
     
@@ -298,12 +300,12 @@ def main():
     n_jackknife = binned_correlators.shape[1]
     jackknife_correlators, jackknife_error = create_jackknife_data(binned_correlators, n_jackknife)
     ### Save the processed data
-    np.save(os.path.join(home_dir, 'pion_masses/', 'binned_correlators.npy'), binned_correlators)
-    np.save(os.path.join(home_dir, 'pion_masses/', 'jackknife_correlators_error.npy'), jackknife_correlators, jackknife_error)
+    np.save(os.path.join(home_dir, 'pion_masses/', 'binned_correlators.txt'), binned_correlators)
+    np.save(os.path.join(home_dir, 'pion_masses/', 'jackknife_correlators_error.txt'), jackknife_correlators, jackknife_error)
     print("Processed data saved.")
     ### Fit the correlators to extract masses 
     ### (note that the range of tau values for the fit function needs to be adjusted by effective mass)
-    fitrange = 10
+    """fitrange = 10
     masses, factor, chisq = fit_correlator(jackknife_correlators, jackknife_error, fitrange)    
     ### Save the fitted masses
     np.save(os.path.join(home_dir, 'pion_masses/', 'fitted_masses.npy'), np.array(masses))
@@ -331,7 +333,7 @@ def main():
 
     fit, determined_kappa = fit_kappa_values(m_pi, jackknife_masses_errors)
     pion_mass = 400 # MeV
-    plot_kappa_values(fit, m_pi, pion_mass, determined_kappa, jackknife_masses_errors)
+    plot_kappa_values(fit, m_pi, pion_mass, determined_kappa, jackknife_masses_errors)"""
 
 if __name__ == "__main__":
     main()
