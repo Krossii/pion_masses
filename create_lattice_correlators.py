@@ -11,15 +11,14 @@ def read_files(file_path, correlators_per_file):
     correlator_data = []
     for f in files:
         file_full_path = os.path.join(file_path, f)
-        zero_B, z_direction, x_direction = split_to_correlators(read_2pt_function(file_full_path), correlators_per_file)
+        z_direction, x_direction = split_to_correlators(read_2pt_function(file_full_path), correlators_per_file)
         z_direction_u, z_direction_d = split_u_d(z_direction)
         x_direction_u, x_direction_d = split_u_d(x_direction)
         data_dict = {
-            'zero_B': zero_B,
-            'z_direction_u': z_direction_u,
-            'z_direction_d': z_direction_d,
-            'x_direction_u': x_direction_u,
-            'x_direction_d': x_direction_d
+            'z_u': z_direction_u,
+            'z_d': z_direction_d,
+            'x_u': x_direction_u,
+            'x_d': x_direction_d
             }
         correlator_data.append(data_dict)
     return correlator_data
@@ -49,8 +48,7 @@ def read_2pt_function(file_path):
 def split_to_correlators(data, num_correlators):
     """
     Splits the 2-point function data into separate correlators.
-    The first entry is the zero-B correlator; the remaining entries are split
-    between the z and x directions.
+    The the entries are split between the z and x directions.
     """
     data = np.asarray(data, dtype=float)
     if num_correlators <= 1:
@@ -62,31 +60,29 @@ def split_to_correlators(data, num_correlators):
     correlators = [data[i * correlator_length:(i + 1) * correlator_length]
                    for i in range(num_correlators)]
 
-    zero_B_correlator = correlators[0]
+    split_index = num_correlators// 2
+    z_direction = correlators[:split_index]
+    x_direction = correlators[split_index:]
 
-    if num_correlators == 2:
-        z_direction = correlators[1:]
-        x_direction = np.array([], dtype=float)
-    else:
-        split_index = num_correlators// 2
-        z_direction = correlators[1:split_index]
-        x_direction = correlators[1 + split_index:]
-
-    print(len(zero_B_correlator), len(z_direction), len(x_direction))
-
-    return zero_B_correlator, z_direction, x_direction
+    return z_direction, x_direction
 
 def split_u_d(data):
     """
     Splits the 2-point function data into up and down quark contributions.
     """
     data = np.asarray(data, dtype=float)
-    print(len(data))
-    if len(data) % 2 != 0:
+
+    if len(data) < 2:
+        raise ValueError("Need at least 2 entries to split into u/d.")
+
+    zeroB = data[0]
+    rest = data[1:]
+
+    if len(rest) % 2 != 0:
         raise ValueError("Data length is not even, cannot split into up and down contributions.")
 
-    u_correlators = data[0::2]
-    d_correlators = data[1::2]
+    u_correlators = np.concatenate(([zeroB], rest[0::2]))
+    d_correlators = rest[1::2]
     return u_correlators, d_correlators
 
 def jackknife_bins(data, n_bins):
@@ -107,7 +103,6 @@ def jackknife_bins(data, n_bins):
     for i in range(n_bins):
         bin_data = np.delete(data, slice(i * bin_size, (i + 1) * bin_size))
         bins.append(np.mean(bin_data))
-        print(np.mean(bin_data)) ### this should print one number for each bin
     return bins
 
 def jackknife_samples(data):
@@ -145,29 +140,69 @@ def jackknife(data, n_bins):
     jackknife_error = np.sqrt((n_bins - 1) / n_bins * np.sum((samples - jackknife_mean)**2))
     return jackknife_mean, jackknife_error
 
+def save_correlator_jackknife(output_dir, correlator_name, Bfield_index, tau_points, jackknife_means, jackknife_errors):
+    """
+    Save one correlator's tau-dependent jackknife output to a file.
+
+    Columns:
+        1. tau point
+        2. jackknife mean
+        3. jackknife error
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    tau_points = np.asarray(tau_points, dtype=int)
+    jackknife_means = np.asarray(jackknife_means, dtype=float)
+    jackknife_errors = np.asarray(jackknife_errors, dtype=float)
+
+    if not (len(tau_points) == len(jackknife_means) == len(jackknife_errors)):
+        raise ValueError("tau_points, jackknife_means, and jackknife_errors must have the same length.")
+
+    B_fields = [0,1,2,4,6,8,10,12]
+
+    if correlator_name.endswith('_d'):
+        output_path = os.path.join(output_dir, f"emconduc_{len(tau_points)}_32_{correlator_name}_B{B_fields[Bfield_index+1]}.txt")    
+    else:
+        output_path = os.path.join(output_dir, f"emconduc_{len(tau_points)}_32_{correlator_name}_B{B_fields[Bfield_index]}.txt")
+    table = np.column_stack((tau_points, jackknife_means, jackknife_errors))
+    np.savetxt(
+        output_path,
+        table,
+        fmt=['%d', '%.12e', '%.12e'],
+        header='tau jackknife_mean jackknife_error',
+        comments='# '
+    )
+    return output_path
+
+
 def main():
     print("Starting analysis of lattice correlators...")
     file_path = "/home/Christian/Desktop/lattice_data/quenched/T0/96x32/"
     correlators_per_file = 30
     correlator_data = read_files(file_path, correlators_per_file)
+    output_dir = "/home/Christian/Desktop/pion_masses/jackknife_output"
 
-    to_analyze = ['zero_B', 'z_direction_u', 'z_direction_d', 'x_direction_u', 'x_direction_d']
+    to_analyze = ['z_u', 'z_d', 'x_u', 'x_d']
 
     for key_name in to_analyze:
         key_data = np.asarray([d[key_name] for d in correlator_data], dtype=float)
         print(f"{key_name} shape: {key_data.shape}")
 
-        if key_data.ndim == 1:
-            key_data = key_data[np.newaxis, :]
+        for Bfields in range(key_data.shape[1]):
+            print(f"Analyzing {key_name} for B-field index {Bfields}")
+            tau_points = np.arange(key_data.shape[-1])
+            jackknife_means = []
+            jackknife_errors = []
+            for tau_point in tau_points:
+                print(f"Analyzing {key_name} at tau point {tau_point}")
+                jackknife_mean, jackknife_error = jackknife(key_data[:, Bfields, tau_point], n_bins=10)
+                jackknife_means.append(jackknife_mean)
+                jackknife_errors.append(jackknife_error)
+                print(f"Jackknife mean at tau point {tau_point}: {jackknife_mean}")
+                print(f"Jackknife error at tau point {tau_point}: {jackknife_error}")
+                print()
 
-        for tau_point in range(key_data.shape[1]):
-            print(f"Analyzing {key_name} at tau point {tau_point}")
-            jackknife_mean, jackknife_error = jackknife(key_data[:, tau_point], n_bins=10)
-            print(f"Jackknife mean at tau point {tau_point}: {jackknife_mean}")
-            print(f"Jackknife error at tau point {tau_point}: {jackknife_error}")
-            print()
-
-    ### find a nice way to save the results to a file
+            save_path = save_correlator_jackknife(output_dir, key_name, Bfields, tau_points, jackknife_means, jackknife_errors)
+            print(f"Saved {key_name} for B-field index {Bfields} results to {save_path}")
 
 
 if __name__ == "__main__":
