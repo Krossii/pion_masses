@@ -1,7 +1,7 @@
 import numpy as np
 import os
 
-def read_files(file_path, correlators_per_file):
+def read_files(file_path, Nt):
     """
     Passes directory to read_2pt_function and split_to_correlators functions.
     """
@@ -11,7 +11,7 @@ def read_files(file_path, correlators_per_file):
     correlator_data = []
     for f in files:
         file_full_path = os.path.join(file_path, f)
-        z_direction, x_direction = split_to_correlators(read_2pt_function(file_full_path), correlators_per_file)
+        z_direction, x_direction = split_to_correlators(read_2pt_function(file_full_path), Nt)
         z_direction_u, z_direction_d = split_u_d(z_direction)
         x_direction_u, x_direction_d = split_u_d(x_direction)
         data_dict = {
@@ -45,22 +45,22 @@ def read_2pt_function(file_path):
                     print(f"Warning: Could not convert {correlator_data} to float. Skipping this entry.")
     return np.array(raw_data)
 
-def split_to_correlators(data, num_correlators):
+def split_to_correlators(data, Nt):
     """
     Splits the 2-point function data into separate correlators.
     The the entries are split between the z and x directions.
     """
     data = np.asarray(data, dtype=float)
-    if num_correlators <= 1:
-        raise ValueError("num_correlators must be greater than 1.")
-    if len(data) % num_correlators != 0:
-        raise ValueError("Data length is not divisible by the number of correlators.")
+    if Nt <= 1:
+        raise ValueError("Nt must be greater than 1.")
+    if len(data) % Nt != 0:
+        raise ValueError("Data length is not divisible by Nt.")
 
-    correlator_length = len(data) // num_correlators
-    correlators = [data[i * correlator_length:(i + 1) * correlator_length]
+    num_correlators = len(data) // Nt
+    correlators = [data[i * Nt:(i + 1) * Nt]
                    for i in range(num_correlators)]
 
-    split_index = num_correlators// 2
+    split_index = Nt // 2
     z_direction = correlators[:split_index]
     x_direction = correlators[split_index:]
 
@@ -176,9 +176,9 @@ def save_correlator_jackknife(output_dir, correlator_name, Bfield_index, tau_poi
 
 def main():
     print("Starting analysis of lattice correlators...")
-    file_path = "/home/Christian/Desktop/lattice_data/quenched/T0/96x32/"
-    correlators_per_file = 30
-    correlator_data = read_files(file_path, correlators_per_file)
+    file_path = "/home/Christian/Desktop/lattice_data/quenched/finite_T/24x32/measurements/"
+    Nt = 24
+    correlator_data = read_files(file_path, Nt)
     output_dir = "/home/Christian/Desktop/pion_masses/jackknife_output"
 
     to_analyze = ['z_u', 'z_d', 'x_u', 'x_d']
