@@ -206,11 +206,11 @@ def save_correlator_jackknife(output_dir, correlator_name, Bfield_index, tau_poi
 
 def main():
     print("Starting analysis of lattice correlators...")
-    Nt = 24
-    file_path = f"/mnt/c/Users/chris/Desktop/lattice_data/quenched/finite_T/{Nt}x32/measurements/"
+    Nt = 96
+    file_path = f"/home/Christian/Desktop/lattice_data/quenched/T0/{Nt}x32/measurements/"
     correlators_per_measurement = 30
     correlator_data = read_files(file_path, Nt, correlators_per_measurement)
-    output_dir = "/mnt/c/Users/chris/Desktop/pion_masses-main/jackknife_output/"
+    output_dir = "/home/Christian/Desktop/pion_masses/jackknife_output/"
 
     to_analyze = ['z_u', 'z_d', 'x_u', 'x_d']
 
@@ -232,11 +232,14 @@ def main():
                 jackknife_estimates.append(estimates)
 
             B_fields = [0,1,2,4,6,8,10,12]
+            half_extent = Nt // 2
             plt.figure()
-            plt.errorbar(tau_points, jackknife_means, yerr=jackknife_errors, fmt='x', markeredgewidth=1, elinewidth=1, capsize=3)
+            plt.errorbar(np.arange(half_extent), jackknife_means[:half_extent], yerr=jackknife_errors[:half_extent], fmt='x', markeredgewidth=1, elinewidth=1, capsize=3, color ='blue', label='First half')
+            plt.errorbar(np.arange(half_extent), np.flipud(jackknife_means)[:half_extent], yerr=np.flipud(jackknife_errors)[:half_extent], fmt='x', markeredgewidth=1, elinewidth=1, capsize=3, color ='red', label='Second half')
             plt.yscale('log')
             plt.xlabel('tau')
             plt.ylabel('Correlator')
+            plt.legend(loc='best')
             if key_name.endswith('_d'):
                 plt.title(f'Correlator_{key_name}_{B_fields[Bfields+1]}')
                 plt.savefig(os.path.join(output_dir, 'plots/', f'Correlator{Nt}_{key_name}_{B_fields[Bfields+1]}'))
