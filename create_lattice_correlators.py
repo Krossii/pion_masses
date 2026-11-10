@@ -169,11 +169,11 @@ def save_correlator_jackknife(output_dir, correlator_name, Bfield_index, tau_poi
 
 def main():
     print("Starting analysis of lattice correlators...")
-    Nt = 96
-    file_path = f"/mnt/c/Users/chris/Desktop/lattice_data/quenched/T0/{Nt}x32/measurements_higheracc/"
+    Nt = 12
+    file_path = f"/mnt/c/Users/chris/Desktop/lattice_data/quenched/finite_T/{Nt}x32/measurements/"
     correlators_per_measurement = 30
     correlator_data = read_files(file_path, Nt, correlators_per_measurement)
-    output_dir = "/mnt/c/Users/chris/Desktop/pion_masses-main/jackknife_output/"
+    output_dir = "/mnt/c/Users/chris/Desktop/pion_masses/jackknife_output/"
 
     C = np.asarray([d['x_d'] for d in correlator_data], dtype=float)[:, 2, :]
     print("n_conf:", len(C))
