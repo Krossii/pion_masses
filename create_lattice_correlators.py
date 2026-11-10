@@ -109,60 +109,24 @@ def split_u_d(data):
     d_correlators = rest[1::2]
     return u_correlators, d_correlators
 
-def jackknife_bins(data, n_bins):
-    """
-    Splits the data into jackknife bins.
-    
-    Parameters:
-    data (np.ndarray): The data to be split into jackknife bins.
-    n_bins (int): The number of jackknife bins to create.
-
-    Returns:
-    list: A list of jackknife bins.
-    """
-    n_data = len(data)
-    bin_size = n_data // n_bins
-
-    bins = []
-    for i in range(n_bins):
-        bin_data = np.delete(data, slice(i * bin_size, (i + 1) * bin_size))
-        bins.append(np.mean(bin_data))
-    return bins
-
-def jackknife_samples(data):
-    """
-    Generates jackknife samples from the given data.
-
-    Parameters:
-    data (np.ndarray): The data from which to generate jackknife samples.
-
-    Returns:
-    list: A list of jackknife samples.
-    """
-    n = len(data)
-    samples = []
-    for i in range(n):
-        sample = np.delete(data, i)
-        samples.append(np.mean(sample))
-    return samples
-
 def jackknife(data, n_bins):
     """
-    Computes the jackknife errors for the given data.
-
-    Parameters:
-    data (np.ndarray): The data for which to compute the jackknife errors.
-    n_bins (int): The number of jackknife bins to create.
-
-    Returns:
-    tuple: The jackknife mean, jackknife error, and leave-one-bin-out estimates.
+        Computes the jackknife errors for the given data.
+    
+        Parameters:
+        data (np.ndarray): The data for which to compute the jackknife errors.
+        n_bins (int): The number of jackknife bins to create.
+    
+        Returns:
+        tuple: The jackknife mean, jackknife error, and leave-one-bin-out estimates.
     """
-    print(f"Computing jackknife errors for data of length {len(data)} with {n_bins} bins.")
-    binned_data = jackknife_bins(data, n_bins)
-    samples = np.asarray(jackknife_samples(binned_data), dtype=float)
-    jackknife_mean = np.mean(samples)
-    jackknife_error = np.sqrt((n_bins - 1) / n_bins * np.sum((samples - jackknife_mean)**2))
-    return jackknife_mean, jackknife_error, samples
+    bin_size = len(data) // n_bins
+    data = data[:bin_size * n_bins]                       # drop remainder
+    bin_means = data.reshape(n_bins, bin_size).mean(axis=1)
+    samples = (bin_means.sum() - bin_means) / (n_bins - 1)  # leave-one-bin-out
+    mean = samples.mean()
+    err = np.sqrt((n_bins - 1) / n_bins * np.sum((samples - mean) ** 2))
+    return mean, err, samples
 
 def save_correlator_jackknife(output_dir, correlator_name, Bfield_index, tau_points, jackknife_means, jackknife_errors, jackknife_estimates):
     """
@@ -203,14 +167,28 @@ def save_correlator_jackknife(output_dir, correlator_name, Bfield_index, tau_poi
     )
     return output_path
 
-
 def main():
     print("Starting analysis of lattice correlators...")
     Nt = 96
-    file_path = f"/home/Christian/Desktop/lattice_data/quenched/T0/{Nt}x32/measurements/"
+    file_path = f"/mnt/c/Users/chris/Desktop/lattice_data/quenched/T0/{Nt}x32/measurements_higheracc/"
     correlators_per_measurement = 30
     correlator_data = read_files(file_path, Nt, correlators_per_measurement)
-    output_dir = "/home/Christian/Desktop/pion_masses/jackknife_output/"
+    output_dir = "/mnt/c/Users/chris/Desktop/pion_masses-main/jackknife_output/"
+
+    C = np.asarray([d['x_d'] for d in correlator_data], dtype=float)[:, 2, :]
+    print("n_conf:", len(C))
+    print("mean  :", np.array2string(C.mean(0), precision=3))
+    print("median:", np.array2string(np.median(C, 0), precision=3))
+
+    # which configs dominate the tail?
+    dev = np.abs(C[:, 3:10] - np.median(C[:, 3:10], axis=0)).max(axis=1)
+    worst = np.argsort(dev)[-5:]
+    print("worst configs:", worst)
+    print(C[worst][:, 3:10])
+
+    # mean without them
+    mask = np.ones(len(C), bool); mask[worst[-3:]] = False
+    print("mean w/o worst 3:", np.array2string(C[mask].mean(0), precision=3))
 
     to_analyze = ['z_u', 'z_d', 'x_u', 'x_d']
 
@@ -218,7 +196,7 @@ def main():
         key_data = np.asarray([d[key_name] for d in correlator_data], dtype=float)
         print(f"{key_name} shape: {key_data.shape}")
 
-        for Bfields in range(key_data.shape[1]):
+        for Bfields in range(key_data.shape[1]):                
             print(f"Analyzing {key_name} for B-field index {Bfields}")
             tau_points = np.arange(key_data.shape[-1])
             jackknife_means = []
@@ -226,7 +204,7 @@ def main():
             jackknife_estimates = []
             for tau_point in tau_points:
                 print(f"Analyzing {key_name} at tau point {tau_point}")
-                jackknife_mean, jackknife_error, estimates = jackknife(key_data[:, Bfields, tau_point], n_bins=10)
+                jackknife_mean, jackknife_error, estimates = jackknife(key_data[:, Bfields, tau_point], n_bins=20)
                 jackknife_means.append(jackknife_mean)
                 jackknife_errors.append(jackknife_error)
                 jackknife_estimates.append(estimates)
@@ -234,8 +212,8 @@ def main():
             B_fields = [0,1,2,4,6,8,10,12]
             half_extent = Nt // 2
             plt.figure()
-            plt.errorbar(np.arange(half_extent), jackknife_means[:half_extent], yerr=jackknife_errors[:half_extent], fmt='x', markeredgewidth=1, elinewidth=1, capsize=3, color ='blue', label='First half')
-            plt.errorbar(np.arange(half_extent), np.flipud(jackknife_means)[:half_extent], yerr=np.flipud(jackknife_errors)[:half_extent], fmt='x', markeredgewidth=1, elinewidth=1, capsize=3, color ='red', label='Second half')
+            plt.errorbar(np.arange(half_extent+1), jackknife_means[:half_extent+1], yerr=jackknife_errors[:half_extent+1], fmt='x', markeredgewidth=1, elinewidth=1, capsize=3, color ='blue', label='First half')
+            plt.errorbar(np.arange(half_extent)+1, np.flipud(jackknife_means)[:half_extent], yerr=np.flipud(jackknife_errors)[:half_extent], fmt='x', markeredgewidth=1, elinewidth=1, capsize=3, color ='red', label='Second half')
             plt.yscale('log')
             plt.xlabel('tau')
             plt.ylabel('Correlator')
